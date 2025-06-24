@@ -177,7 +177,7 @@ Geef alleen de vraag terug${quizType === 'multiple-choice' ? ' met de 4 antwoord
         
         if (quizType === 'multiple-choice') {
           // Parse multiple choice question
-          const lines = questionText.split('\n').filter(line => line.trim())
+          const lines = questionText.split('\n').filter(line => line.trim)
           const questionLine = lines[0]
           const options = lines.slice(1).filter(line => line.match(/^[a-d]\)/))
           
