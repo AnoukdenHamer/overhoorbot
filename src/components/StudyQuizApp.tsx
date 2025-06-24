@@ -310,9 +310,9 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
         let question: QuizQuestion
         
         if (studySession.quizType === 'multiple-choice') {
-          const lines = questionText.split('\n').filter(line => line.trim())
+         const lines = questionText.split('\n').filter((line: string) => line.trim())
           const questionLine = lines[0]
-          const options = lines.slice(1).filter(line => line.match(/^[a-d]\)/))
+          const options = lines.slice(1).filter((line: string) => line.match(/^[a-d]\)/))
           
           question = {
             id: studySession.currentQuestionIndex + 1,
