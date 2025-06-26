@@ -2,12 +2,16 @@
 
 import { useState, useRef } from 'react'
 
-type StudyStep = 'subject' | 'material' | 'upload' | 'generating' | 'quiz-type' | 'quiz'
+type StudyStep = 'subject' | 'material-choice' | 'upload' | 'link' | 'search' | 'generating' | 'quiz-type' | 'quiz'
+type MaterialSource = 'upload' | 'link' | 'search' | null
 type QuizType = 'open' | 'multiple-choice' | null
 
 interface StudySession {
   subject: string
+  materialSource: MaterialSource
   uploadedFiles: File[]
+  linkUrl: string
+  searchQuery: string
   quizType: QuizType
   currentQuestionIndex: number
   score: number
@@ -30,7 +34,10 @@ export default function StudyQuizApp() {
   const [currentStep, setCurrentStep] = useState<StudyStep>('subject')
   const [studySession, setStudySession] = useState<StudySession>({
     subject: '',
+    materialSource: null,
     uploadedFiles: [],
+    linkUrl: '',
+    searchQuery: '',
     quizType: null,
     currentQuestionIndex: 0,
     score: 0,
@@ -38,6 +45,7 @@ export default function StudyQuizApp() {
   })
   
   const [subjectInput, setSubjectInput] = useState('')
+  const [linkInput, setLinkInput] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(null)
@@ -52,7 +60,28 @@ export default function StudyQuizApp() {
   const handleSubjectSubmit = () => {
     if (subjectInput.trim()) {
       setStudySession(prev => ({ ...prev, subject: subjectInput.trim() }))
-      setCurrentStep('material')
+      setCurrentStep('material-choice')
+    }
+  }
+
+  const handleMaterialChoice = (choice: MaterialSource) => {
+    setStudySession(prev => ({ ...prev, materialSource: choice }))
+    
+    if (choice === 'upload') {
+      setCurrentStep('upload')
+    } else if (choice === 'link') {
+      setCurrentStep('link')
+    } else if (choice === 'search') {
+      // Voor search gaan we direct naar quiz-type omdat we online gaan zoeken
+      setStudySession(prev => ({ ...prev, searchQuery: prev.subject }))
+      setCurrentStep('quiz-type')
+    }
+  }
+
+  const handleLinkSubmit = () => {
+    if (linkInput.trim()) {
+      setStudySession(prev => ({ ...prev, linkUrl: linkInput.trim() }))
+      setCurrentStep('quiz-type')
     }
   }
 
@@ -130,9 +159,7 @@ export default function StudyQuizApp() {
   }
 
   const proceedToQuizType = () => {
-    if (studySession.uploadedFiles.length > 0) {
-      setCurrentStep('quiz-type')
-    }
+    setCurrentStep('quiz-type')
   }
 
   const handleQuizTypeSelection = (type: QuizType) => {
@@ -145,12 +172,23 @@ export default function StudyQuizApp() {
     setIsGenerating(true)
     
     try {
-      const prompt = `Je bent een universitaire tutor die studenten overhoor. 
+      let prompt = `Je bent een universitaire tutor die studenten overhoor. 
 
 CONTEXT:
 - Onderwerp: ${studySession.subject}
 - Quiz type: ${quizType === 'open' ? 'open vragen' : 'multiple choice vragen'}
-- Studiemateriaal: ${studyMaterial}
+- Materiaal bron: ${studySession.materialSource === 'upload' ? 'Geüploade bestanden' : 
+                   studySession.materialSource === 'link' ? 'Website link' : 'Online zoeken'}`
+
+      if (studySession.materialSource === 'upload' && studyMaterial) {
+        prompt += `\n- Studiemateriaal: ${studyMaterial}`
+      } else if (studySession.materialSource === 'link') {
+        prompt += `\n- Website: ${studySession.linkUrl}\n\nAnalyseer eerst de inhoud van deze website en gebruik dit als basis voor de vragen.`
+      } else if (studySession.materialSource === 'search') {
+        prompt += `\n\nZoek online naar actuele informatie over "${studySession.subject}" en gebruik dit als basis voor de vragen.`
+      }
+
+      prompt += `
 
 INSTRUCTIES:
 ${quizType === 'open' 
@@ -165,7 +203,7 @@ Geef alleen de vraag terug${quizType === 'multiple-choice' ? ' met de 4 antwoord
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: prompt,
-          aiModel: 'smart'
+          aiModel: 'smart' // Gebruik smart model voor snelle responses
         }),
       })
 
@@ -220,6 +258,15 @@ Geef alleen de vraag terug${quizType === 'multiple-choice' ? ' met de 4 antwoord
     setIsGenerating(true)
     
     try {
+      let contextInfo = ''
+      if (studySession.materialSource === 'upload' && studyMaterial) {
+        contextInfo = `STUDIEMATERIAAL: ${studyMaterial}`
+      } else if (studySession.materialSource === 'link') {
+        contextInfo = `WEBSITE: ${studySession.linkUrl}\n\nAnalyseer de inhoud van deze website voor context.`
+      } else if (studySession.materialSource === 'search') {
+        contextInfo = `Gebruik actuele online informatie over "${studySession.subject}" als referentie.`
+      }
+
       const prompt = `Je bent een universitaire tutor. Een student heeft een vraag beantwoord.
 
 VRAAG: ${currentQuestion.question}
@@ -228,7 +275,7 @@ ${currentQuestion.options ? `OPTIES:\n${currentQuestion.options.join('\n')}` : '
 STUDENT ANTWOORD: ${userAnswer}
 ${userExplanation ? `STUDENT UITLEG: ${userExplanation}` : ''}
 
-STUDIEMATERIAAL: ${studyMaterial}
+${contextInfo}
 
 Geef feedback als een ervaren docent:
 1. Beoordeel of het antwoord correct is
@@ -277,6 +324,15 @@ Geef alleen de feedback, geen nieuwe vragen.`
       const difficulty = studySession.questionsAnswered < 3 ? 'easy' : 
                         studySession.questionsAnswered < 7 ? 'medium' : 'hard'
       
+      let contextInfo = ''
+      if (studySession.materialSource === 'upload' && studyMaterial) {
+        contextInfo = `STUDIEMATERIAAL: ${studyMaterial}`
+      } else if (studySession.materialSource === 'link') {
+        contextInfo = `WEBSITE: ${studySession.linkUrl}\n\nAnalyseer de inhoud van deze website voor context.`
+      } else if (studySession.materialSource === 'search') {
+        contextInfo = `Gebruik actuele online informatie over "${studySession.subject}" als referentie.`
+      }
+
       const prompt = `Je bent een universitaire tutor die studenten overhoor.
 
 CONTEXT:
@@ -284,7 +340,8 @@ CONTEXT:
 - Quiz type: ${studySession.quizType === 'open' ? 'open vragen' : 'multiple choice vragen'}
 - Vragen beantwoord: ${studySession.questionsAnswered}
 - Moeilijkheidsgraad: ${difficulty}
-- Studiemateriaal: ${studyMaterial}
+
+${contextInfo}
 
 INSTRUCTIES:
 ${studySession.quizType === 'open' 
@@ -383,14 +440,139 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
     </div>
   )
 
-  const renderMaterialStep = () => (
+  const renderMaterialChoiceStep = () => (
     <div className="bg-white rounded-xl shadow-lg p-8">
       <div className="text-center mb-8">
         <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">📖</span>
         </div>
         <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Upload je samenvattingen en aantekeningen
+          Hoe wil je studiemateriaal aanleveren?
+        </h2>
+        <p className="text-gray-600 mb-4">
+          Onderwerp: <span className="font-semibold text-blue-600">{studySession.subject}</span>
+        </p>
+        <p className="text-gray-500 text-sm">
+          Kies de manier die het beste bij jouw situatie past
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-8">
+        {/* Upload Option */}
+        <div 
+          onClick={() => handleMaterialChoice('upload')}
+          className="border-2 border-gray-200 rounded-xl p-6 hover:border-blue-500 hover:bg-blue-50 cursor-pointer transition-all group"
+        >
+          <div className="text-center">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-200">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              📄 Upload materiaal
+            </h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Upload je eigen samenvattingen, aantekeningen of studiemateriaal
+            </p>
+            <div className="text-xs text-gray-500 space-y-1">
+              <div>✓ PDF, DOCX, TXT bestanden</div>
+              <div>✓ Jouw eigen aantekeningen</div>
+              <div>✓ Meest nauwkeurig</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Link Option */}
+        <div 
+          onClick={() => handleMaterialChoice('link')}
+          className="border-2 border-gray-200 rounded-xl p-6 hover:border-green-500 hover:bg-green-50 cursor-pointer transition-all group"
+        >
+          <div className="text-center">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-green-200">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              🔗 Geef een link
+            </h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Deel een link naar online studiemateriaal, artikelen of websites
+            </p>
+            <div className="text-xs text-gray-500 space-y-1">
+              <div>✓ Wikipedia artikelen</div>
+              <div>✓ Online cursussen</div>
+              <div>✓ Wetenschappelijke artikelen</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search Option */}
+        <div 
+          onClick={() => handleMaterialChoice('search')}
+          className="border-2 border-gray-200 rounded-xl p-6 hover:border-purple-500 hover:bg-purple-50 cursor-pointer transition-all group"
+        >
+          <div className="text-center">
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-purple-200">
+              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              🌐 Online zoeken
+            </h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Laat mij online naar actuele informatie over jouw onderwerp zoeken
+            </p>
+            <div className="text-xs text-gray-500 space-y-1">
+              <div>✓ Actuele informatie</div>
+              <div>✓ Meerdere bronnen</div>
+              <div>✓ Geen voorbereiding nodig</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Important Notice for Upload */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 max-w-2xl mx-auto">
+        <div className="flex items-start space-x-3">
+          <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center mt-0.5">
+            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <div>
+            <h4 className="font-semibold text-amber-800 mb-2">💡 Tips voor het beste resultaat</h4>
+            <ul className="text-sm text-amber-700 space-y-1">
+              <li><strong>Upload materiaal:</strong> Zorg dat je aantekeningen geen fouten bevatten</li>
+              <li><strong>Link delen:</strong> Gebruik betrouwbare bronnen zoals Wikipedia of .edu sites</li>
+              <li><strong>Online zoeken:</strong> Ik zoek naar de meest actuele en betrouwbare informatie</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="text-center mt-8">
+        <button
+          onClick={() => setCurrentStep('subject')}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          ← Terug naar onderwerp
+        </button>
+      </div>
+    </div>
+  )
+
+  const renderUploadStep = () => (
+    <div className="bg-white rounded-xl shadow-lg p-8">
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-2xl">📄</span>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          Upload je studiemateriaal
         </h2>
         <p className="text-gray-600 mb-4">
           Onderwerp: <span className="font-semibold text-blue-600">{studySession.subject}</span>
@@ -505,7 +687,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
       {/* Navigation */}
       <div className="flex justify-between">
         <button
-          onClick={() => setCurrentStep('subject')}
+          onClick={() => setCurrentStep('material-choice')}
           className="text-gray-500 hover:text-gray-700"
         >
           ← Terug
@@ -513,10 +695,74 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
         
         <button
           onClick={proceedToQuizType}
-          disabled={studySession.uploadedFiles.length === 0}
-          className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors"
         >
-          Kies quiz type →
+          Doorgaan naar quiz type →
+        </button>
+      </div>
+    </div>
+  )
+
+  const renderLinkStep = () => (
+    <div className="bg-white rounded-xl shadow-lg p-8">
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-2xl">🔗</span>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          Deel een link naar studiemateriaal
+        </h2>
+        <p className="text-gray-600 mb-4">
+          Onderwerp: <span className="font-semibold text-blue-600">{studySession.subject}</span>
+        </p>
+        <p className="text-gray-500 text-sm">
+          Plak hier de URL naar online studiemateriaal, artikelen of websites
+        </p>
+      </div>
+
+      <div className="max-w-md mx-auto">
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Website URL
+          </label>
+          <input
+            type="url"
+            value={linkInput}
+            onChange={(e) => setLinkInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleLinkSubmit()}
+            placeholder="https://example.com/artikel-over-onderwerp"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* Examples */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <h4 className="font-semibold text-green-800 mb-2">💡 Voorbeelden van goede bronnen:</h4>
+          <ul className="text-sm text-green-700 space-y-1">
+            <li>• Wikipedia artikelen</li>
+            <li>• Universitaire websites (.edu)</li>
+            <li>• Online cursusmateriaal</li>
+            <li>• Wetenschappelijke artikelen</li>
+            <li>• Educatieve YouTube video's</li>
+          </ul>
+        </div>
+
+        <button
+          onClick={handleLinkSubmit}
+          disabled={!linkInput.trim()}
+          className="w-full bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+        >
+          Analyseer website →
+        </button>
+      </div>
+
+      {/* Navigation */}
+      <div className="text-center mt-8">
+        <button
+          onClick={() => setCurrentStep('material-choice')}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          ← Terug naar opties
         </button>
       </div>
     </div>
@@ -533,6 +779,12 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
         </h2>
         <p className="text-gray-600 mb-2">
           Onderwerp: <span className="font-semibold text-blue-600">{studySession.subject}</span>
+        </p>
+        <p className="text-gray-600 mb-2">
+          Materiaal: <span className="font-semibold text-purple-600">
+            {studySession.materialSource === 'upload' ? 'Geüploade bestanden' :
+             studySession.materialSource === 'link' ? 'Website link' : 'Online zoeken'}
+          </span>
         </p>
         <p className="text-gray-500 text-sm">
           Kies het type vragen dat het beste bij jouw leerstijl past
@@ -618,10 +870,18 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
       {/* Navigation */}
       <div className="text-center mt-8">
         <button
-          onClick={() => setCurrentStep('material')}
+          onClick={() => {
+            if (studySession.materialSource === 'upload') {
+              setCurrentStep('upload')
+            } else if (studySession.materialSource === 'link') {
+              setCurrentStep('link')
+            } else {
+              setCurrentStep('material-choice')
+            }
+          }}
           className="text-gray-500 hover:text-gray-700"
         >
-          ← Terug naar bestanden
+          ← Terug
         </button>
       </div>
     </div>
@@ -646,8 +906,16 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
             {studySession.quizType === 'open' ? 'Open vragen' : 'Multiple choice'}
           </span>
         </p>
+        <p className="text-gray-600 mb-2">
+          Materiaal: <span className="font-semibold text-green-600">
+            {studySession.materialSource === 'upload' ? 'Geüploade bestanden' :
+             studySession.materialSource === 'link' ? 'Website analyse' : 'Online zoeken'}
+          </span>
+        </p>
         <p className="text-gray-500 text-sm mb-8">
-          Ik analyseer je samenvattingen en aantekeningen om gepersonaliseerde vragen te maken
+          {studySession.materialSource === 'upload' ? 'Ik analyseer je samenvattingen en aantekeningen om gepersonaliseerde vragen te maken' :
+           studySession.materialSource === 'link' ? 'Ik analyseer de website inhoud om relevante vragen te maken' :
+           'Ik zoek online naar actuele informatie om vragen te maken'}
         </p>
 
         <div className="max-w-md mx-auto">
@@ -658,7 +926,11 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
           <div className="space-y-2 text-sm text-gray-600">
             <div className="flex items-center justify-center space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span>Studiemateriaal geanalyseerd</span>
+              <span>
+                {studySession.materialSource === 'upload' ? 'Studiemateriaal geanalyseerd' :
+                 studySession.materialSource === 'link' ? 'Website inhoud geanalyseerd' :
+                 'Online informatie verzameld'}
+              </span>
             </div>
             <div className="flex items-center justify-center space-x-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
@@ -686,7 +958,9 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
               {studySession.subject} - {studySession.quizType === 'open' ? 'Open vraag' : 'Multiple choice'}
             </h2>
             <p className="text-gray-600 text-sm">
-              Vraag {studySession.questionsAnswered + 1} • Moeilijkheid: {currentQuestion.difficulty}
+              Vraag {studySession.questionsAnswered + 1} • Moeilijkheid: {currentQuestion.difficulty} • 
+              Materiaal: {studySession.materialSource === 'upload' ? 'Upload' :
+                        studySession.materialSource === 'link' ? 'Link' : 'Online'}
             </p>
           </div>
           <div className="text-right">
@@ -812,8 +1086,12 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
   switch (currentStep) {
     case 'subject':
       return renderSubjectStep()
-    case 'material':
-      return renderMaterialStep()
+    case 'material-choice':
+      return renderMaterialChoiceStep()
+    case 'upload':
+      return renderUploadStep()
+    case 'link':
+      return renderLinkStep()
     case 'quiz-type':
       return renderQuizTypeStep()
     case 'generating':
