@@ -203,7 +203,7 @@ Geef alleen de vraag terug${quizType === 'multiple-choice' ? ' met de 4 antwoord
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: prompt,
-          aiModel: 'smart' // Gebruik smart model voor snelle responses
+          aiModel: 'smart' // Using Gemini 2.5 Flash for fastest responses
         }),
       })
 
@@ -291,7 +291,7 @@ Geef alleen de feedback, geen nieuwe vragen.`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: prompt,
-          aiModel: 'smart'
+          aiModel: 'smart' // Using Gemini 2.5 Flash for fastest responses
         }),
       })
 
@@ -356,7 +356,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: prompt,
-          aiModel: 'smart'
+          aiModel: 'smart' // Using Gemini 2.5 Flash for fastest responses
         }),
       })
 
@@ -855,7 +855,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
             <p className="text-sm text-gray-700">
               <strong>Privacy:</strong> Je studiemateriaal wordt veilig verwerkt. 
               Bekijk ons <a 
-                href="https://docs.google.com/document/d/1ShD0lWCjerlQn4eL1H870De4zYPLxGr6AoVNzdLw7yM/edit?usp=sharing" 
+                href="https://docs.google.com/document/d/1pc7HbYXisQPSSMluCgI_ok0jpulmQH1Et4p0PHT6he8/edit?tab=t.0" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:text-blue-800 underline"
