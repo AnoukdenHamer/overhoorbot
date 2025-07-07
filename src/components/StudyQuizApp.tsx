@@ -2,8 +2,8 @@
 
 import { useState, useRef } from 'react'
 
-type StudyStep = 'subject' | 'material-choice' | 'upload' | 'link' | 'search' | 'generating' | 'quiz-type' | 'quiz'
-type MaterialSource = 'upload' | 'link' | 'search' | null
+type StudyStep = 'subject' | 'material-choice' | 'upload' | 'link' | 'generating' | 'quiz-type' | 'quiz'
+type MaterialSource = 'upload' | 'link' | 'knowledge' | null
 type QuizType = 'open' | 'multiple-choice' | null
 
 interface StudySession {
@@ -11,7 +11,6 @@ interface StudySession {
   materialSource: MaterialSource
   uploadedFiles: File[]
   linkUrl: string
-  searchQuery: string
   quizType: QuizType
   currentQuestionIndex: number
   score: number
@@ -37,7 +36,6 @@ export default function StudyQuizApp() {
     materialSource: null,
     uploadedFiles: [],
     linkUrl: '',
-    searchQuery: '',
     quizType: null,
     currentQuestionIndex: 0,
     score: 0,
@@ -71,9 +69,8 @@ export default function StudyQuizApp() {
       setCurrentStep('upload')
     } else if (choice === 'link') {
       setCurrentStep('link')
-    } else if (choice === 'search') {
-      // Voor search gaan we direct naar quiz-type omdat we online gaan zoeken
-      setStudySession(prev => ({ ...prev, searchQuery: prev.subject }))
+    } else if (choice === 'knowledge') {
+      // Direct to quiz-type for knowledge-based questions
       setCurrentStep('quiz-type')
     }
   }
@@ -178,14 +175,14 @@ CONTEXT:
 - Onderwerp: ${studySession.subject}
 - Quiz type: ${quizType === 'open' ? 'open vragen' : 'multiple choice vragen'}
 - Materiaal bron: ${studySession.materialSource === 'upload' ? 'Geüploade bestanden' : 
-                   studySession.materialSource === 'link' ? 'Website link' : 'Online zoeken'}`
+                   studySession.materialSource === 'link' ? 'Website link' : 'Algemene kennis'}`
 
       if (studySession.materialSource === 'upload' && studyMaterial) {
         prompt += `\n- Studiemateriaal: ${studyMaterial}`
       } else if (studySession.materialSource === 'link') {
         prompt += `\n- Website: ${studySession.linkUrl}\n\nAnalyseer eerst de inhoud van deze website en gebruik dit als basis voor de vragen.`
-      } else if (studySession.materialSource === 'search') {
-        prompt += `\n\nZoek online naar actuele informatie over "${studySession.subject}" en gebruik dit als basis voor de vragen.`
+      } else if (studySession.materialSource === 'knowledge') {
+        prompt += `\n\nGebruik je algemene kennis over "${studySession.subject}" om vragen te maken. Focus op de belangrijkste concepten en theorieën binnen dit vakgebied.`
       }
 
       prompt += `
@@ -263,8 +260,8 @@ Geef alleen de vraag terug${quizType === 'multiple-choice' ? ' met de 4 antwoord
         contextInfo = `STUDIEMATERIAAL: ${studyMaterial}`
       } else if (studySession.materialSource === 'link') {
         contextInfo = `WEBSITE: ${studySession.linkUrl}\n\nAnalyseer de inhoud van deze website voor context.`
-      } else if (studySession.materialSource === 'search') {
-        contextInfo = `Gebruik actuele online informatie over "${studySession.subject}" als referentie.`
+      } else if (studySession.materialSource === 'knowledge') {
+        contextInfo = `Gebruik je algemene kennis over "${studySession.subject}" als referentie.`
       }
 
       const prompt = `Je bent een universitaire tutor. Een student heeft een vraag beantwoord.
@@ -329,8 +326,8 @@ Geef alleen de feedback, geen nieuwe vragen.`
         contextInfo = `STUDIEMATERIAAL: ${studyMaterial}`
       } else if (studySession.materialSource === 'link') {
         contextInfo = `WEBSITE: ${studySession.linkUrl}\n\nAnalyseer de inhoud van deze website voor context.`
-      } else if (studySession.materialSource === 'search') {
-        contextInfo = `Gebruik actuele online informatie over "${studySession.subject}" als referentie.`
+      } else if (studySession.materialSource === 'knowledge') {
+        contextInfo = `Gebruik je algemene kennis over "${studySession.subject}" als referentie.`
       }
 
       const prompt = `Je bent een universitaire tutor die studenten overhoor.
@@ -508,27 +505,27 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
           </div>
         </div>
 
-        {/* Search Option */}
+        {/* Knowledge-based Option */}
         <div 
-          onClick={() => handleMaterialChoice('search')}
+          onClick={() => handleMaterialChoice('knowledge')}
           className="border-2 border-gray-200 rounded-xl p-6 hover:border-purple-500 hover:bg-purple-50 cursor-pointer transition-all group"
         >
           <div className="text-center">
             <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-purple-200">
               <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
             <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              🌐 Online zoeken
+              🧠 Algemene kennis
             </h3>
             <p className="text-gray-600 text-sm mb-4">
-              Laat mij online naar actuele informatie over jouw onderwerp zoeken
+              Laat mij vragen maken op basis van algemene kennis over jouw onderwerp
             </p>
             <div className="text-xs text-gray-500 space-y-1">
-              <div>✓ Actuele informatie</div>
-              <div>✓ Meerdere bronnen</div>
+              <div>✓ Snelste optie</div>
               <div>✓ Geen voorbereiding nodig</div>
+              <div>✓ Standaard universitaire stof</div>
             </div>
           </div>
         </div>
@@ -547,7 +544,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
             <ul className="text-sm text-amber-700 space-y-1">
               <li><strong>Upload materiaal:</strong> Zorg dat je aantekeningen geen fouten bevatten</li>
               <li><strong>Link delen:</strong> Gebruik betrouwbare bronnen zoals Wikipedia of .edu sites</li>
-              <li><strong>Online zoeken:</strong> Ik zoek naar de meest actuele en betrouwbare informatie</li>
+              <li><strong>Algemene kennis:</strong> Snelste optie voor standaard universitaire onderwerpen</li>
             </ul>
           </div>
         </div>
@@ -783,7 +780,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
         <p className="text-gray-600 mb-2">
           Materiaal: <span className="font-semibold text-purple-600">
             {studySession.materialSource === 'upload' ? 'Geüploade bestanden' :
-             studySession.materialSource === 'link' ? 'Website link' : 'Online zoeken'}
+             studySession.materialSource === 'link' ? 'Website link' : 'Algemene kennis'}
           </span>
         </p>
         <p className="text-gray-500 text-sm">
@@ -909,13 +906,13 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
         <p className="text-gray-600 mb-2">
           Materiaal: <span className="font-semibold text-green-600">
             {studySession.materialSource === 'upload' ? 'Geüploade bestanden' :
-             studySession.materialSource === 'link' ? 'Website analyse' : 'Online zoeken'}
+             studySession.materialSource === 'link' ? 'Website analyse' : 'Algemene kennis'}
           </span>
         </p>
         <p className="text-gray-500 text-sm mb-8">
           {studySession.materialSource === 'upload' ? 'Ik analyseer je samenvattingen en aantekeningen om gepersonaliseerde vragen te maken' :
            studySession.materialSource === 'link' ? 'Ik analyseer de website inhoud om relevante vragen te maken' :
-           'Ik zoek online naar actuele informatie om vragen te maken'}
+           'Ik gebruik mijn kennis over dit onderwerp om vragen te maken'}
         </p>
 
         <div className="max-w-md mx-auto">
@@ -929,7 +926,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
               <span>
                 {studySession.materialSource === 'upload' ? 'Studiemateriaal geanalyseerd' :
                  studySession.materialSource === 'link' ? 'Website inhoud geanalyseerd' :
-                 'Online informatie verzameld'}
+                 'Onderwerp kennis geladen'}
               </span>
             </div>
             <div className="flex items-center justify-center space-x-2">
@@ -960,7 +957,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
             <p className="text-gray-600 text-sm">
               Vraag {studySession.questionsAnswered + 1} • Moeilijkheid: {currentQuestion.difficulty} • 
               Materiaal: {studySession.materialSource === 'upload' ? 'Upload' :
-                        studySession.materialSource === 'link' ? 'Link' : 'Online'}
+                        studySession.materialSource === 'link' ? 'Link' : 'Kennis'}
             </p>
           </div>
           <div className="text-right">
