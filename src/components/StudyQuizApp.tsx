@@ -169,31 +169,25 @@ export default function StudyQuizApp() {
     setIsGenerating(true)
     
     try {
-      let prompt = `Je bent een universitaire tutor die studenten overhoor. 
-
-CONTEXT:
-- Onderwerp: ${studySession.subject}
-- Quiz type: ${quizType === 'open' ? 'open vragen' : 'multiple choice vragen'}
-- Materiaal bron: ${studySession.materialSource === 'upload' ? 'Geüploade bestanden' : 
-                   studySession.materialSource === 'link' ? 'Website link' : 'Algemene kennis'}`
+      // SIMPLIFIED PROMPT for maximum speed
+      let prompt = `Maak 1 ${quizType === 'open' ? 'open vraag' : 'multiple choice vraag'} over ${studySession.subject}.`
 
       if (studySession.materialSource === 'upload' && studyMaterial) {
-        prompt += `\n- Studiemateriaal: ${studyMaterial}`
+        prompt += ` Gebruik deze inhoud: ${studyMaterial.substring(0, 1000)}`
       } else if (studySession.materialSource === 'link') {
-        prompt += `\n- Website: ${studySession.linkUrl}\n\nAnalyseer eerst de inhoud van deze website en gebruik dit als basis voor de vragen.`
-      } else if (studySession.materialSource === 'knowledge') {
-        prompt += `\n\nGebruik je algemene kennis over "${studySession.subject}" om vragen te maken. Focus op de belangrijkste concepten en theorieën binnen dit vakgebied.`
+        prompt += ` Analyseer deze website: ${studySession.linkUrl}`
+      } else {
+        // Knowledge-based - super simple prompt
+        prompt += ` Focus op basisconcepten.`
       }
 
-      prompt += `
+      if (quizType === 'multiple-choice') {
+        prompt += ` Geef 4 opties (a, b, c, d).`
+      }
 
-INSTRUCTIES:
-${quizType === 'open' 
-  ? `Maak 1 open vraag over de stof. Begin eenvoudig. Stel NOOIT meerdere vragen tegelijk.`
-  : `Maak 1 multiple choice vraag over de stof. Begin eenvoudig. Geef 4 antwoordopties (a, b, c, d). Zorg dat de foute opties plausibel en misleidend zijn. Stel NOOIT meerdere vragen tegelijk.`
-}
+      prompt += ` Geef alleen de vraag terug, geen extra tekst.`
 
-Geef alleen de vraag terug${quizType === 'multiple-choice' ? ' met de 4 antwoordopties' : ''}, geen extra tekst.`
+      console.log('🚀 Sending simplified prompt:', prompt.substring(0, 100) + '...')
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -255,33 +249,14 @@ Geef alleen de vraag terug${quizType === 'multiple-choice' ? ' met de 4 antwoord
     setIsGenerating(true)
     
     try {
-      let contextInfo = ''
-      if (studySession.materialSource === 'upload' && studyMaterial) {
-        contextInfo = `STUDIEMATERIAAL: ${studyMaterial}`
-      } else if (studySession.materialSource === 'link') {
-        contextInfo = `WEBSITE: ${studySession.linkUrl}\n\nAnalyseer de inhoud van deze website voor context.`
-      } else if (studySession.materialSource === 'knowledge') {
-        contextInfo = `Gebruik je algemene kennis over "${studySession.subject}" als referentie.`
+      // SIMPLIFIED FEEDBACK PROMPT
+      let prompt = `Beoordeel dit antwoord kort:\n\nVraag: ${currentQuestion.question}\nAntwoord: ${userAnswer}`
+      
+      if (userExplanation) {
+        prompt += `\nUitleg: ${userExplanation}`
       }
 
-      const prompt = `Je bent een universitaire tutor. Een student heeft een vraag beantwoord.
-
-VRAAG: ${currentQuestion.question}
-${currentQuestion.options ? `OPTIES:\n${currentQuestion.options.join('\n')}` : ''}
-
-STUDENT ANTWOORD: ${userAnswer}
-${userExplanation ? `STUDENT UITLEG: ${userExplanation}` : ''}
-
-${contextInfo}
-
-Geef feedback als een ervaren docent:
-1. Beoordeel of het antwoord correct is
-2. Geef uitleg waarom het goed of fout is
-3. Verwijs naar de studiemateriaal waar relevant
-4. Wees vriendelijk maar kritisch
-5. Help de student begrijpen
-
-Geef alleen de feedback, geen nieuwe vragen.`
+      prompt += `\n\nGeef kort feedback: correct/incorrect en waarom.`
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -321,32 +296,14 @@ Geef alleen de feedback, geen nieuwe vragen.`
       const difficulty = studySession.questionsAnswered < 3 ? 'easy' : 
                         studySession.questionsAnswered < 7 ? 'medium' : 'hard'
       
-      let contextInfo = ''
-      if (studySession.materialSource === 'upload' && studyMaterial) {
-        contextInfo = `STUDIEMATERIAAL: ${studyMaterial}`
-      } else if (studySession.materialSource === 'link') {
-        contextInfo = `WEBSITE: ${studySession.linkUrl}\n\nAnalyseer de inhoud van deze website voor context.`
-      } else if (studySession.materialSource === 'knowledge') {
-        contextInfo = `Gebruik je algemene kennis over "${studySession.subject}" als referentie.`
+      // ULTRA SIMPLIFIED PROMPT for speed
+      let prompt = `Maak 1 ${studySession.quizType === 'open' ? 'open vraag' : 'multiple choice vraag'} over ${studySession.subject}.`
+
+      if (studySession.quizType === 'multiple-choice') {
+        prompt += ` Geef 4 opties (a, b, c, d).`
       }
 
-      const prompt = `Je bent een universitaire tutor die studenten overhoor.
-
-CONTEXT:
-- Onderwerp: ${studySession.subject}
-- Quiz type: ${studySession.quizType === 'open' ? 'open vragen' : 'multiple choice vragen'}
-- Vragen beantwoord: ${studySession.questionsAnswered}
-- Moeilijkheidsgraad: ${difficulty}
-
-${contextInfo}
-
-INSTRUCTIES:
-${studySession.quizType === 'open' 
-  ? `Maak 1 ${difficulty} open vraag over de stof. Stel NOOIT meerdere vragen tegelijk.`
-  : `Maak 1 ${difficulty} multiple choice vraag over de stof. Geef 4 antwoordopties (a, b, c, d). Zorg dat de foute opties plausibel en misleidend zijn. Stel NOOIT meerdere vragen tegelijk.`
-}
-
-Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met de 4 antwoordopties' : ''}, geen extra tekst.`
+      prompt += ` Geef alleen de vraag terug.`
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -505,7 +462,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
           </div>
         </div>
 
-        {/* Knowledge-based Option */}
+        {/* Knowledge-based Option - CLARIFIED */}
         <div 
           onClick={() => handleMaterialChoice('knowledge')}
           className="border-2 border-gray-200 rounded-xl p-6 hover:border-purple-500 hover:bg-purple-50 cursor-pointer transition-all group"
@@ -517,10 +474,10 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
               </svg>
             </div>
             <h3 className="text-lg font-semibold text-gray-800 mb-2">
-              🧠 Algemene kennis
+              🧠 Zonder materiaal
             </h3>
             <p className="text-gray-600 text-sm mb-4">
-              Laat mij vragen maken op basis van algemene kennis over jouw onderwerp
+              Ik maak vragen op basis van mijn kennis over jouw onderwerp (geen internet)
             </p>
             <div className="text-xs text-gray-500 space-y-1">
               <div>✓ Snelste optie</div>
@@ -544,7 +501,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
             <ul className="text-sm text-amber-700 space-y-1">
               <li><strong>Upload materiaal:</strong> Zorg dat je aantekeningen geen fouten bevatten</li>
               <li><strong>Link delen:</strong> Gebruik betrouwbare bronnen zoals Wikipedia of .edu sites</li>
-              <li><strong>Algemene kennis:</strong> Snelste optie voor standaard universitaire onderwerpen</li>
+              <li><strong>Zonder materiaal:</strong> Snelste optie voor standaard universitaire onderwerpen</li>
             </ul>
           </div>
         </div>
@@ -780,7 +737,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
         <p className="text-gray-600 mb-2">
           Materiaal: <span className="font-semibold text-purple-600">
             {studySession.materialSource === 'upload' ? 'Geüploade bestanden' :
-             studySession.materialSource === 'link' ? 'Website link' : 'Algemene kennis'}
+             studySession.materialSource === 'link' ? 'Website link' : 'Zonder materiaal'}
           </span>
         </p>
         <p className="text-gray-500 text-sm">
@@ -906,7 +863,7 @@ Geef alleen de vraag terug${studySession.quizType === 'multiple-choice' ? ' met 
         <p className="text-gray-600 mb-2">
           Materiaal: <span className="font-semibold text-green-600">
             {studySession.materialSource === 'upload' ? 'Geüploade bestanden' :
-             studySession.materialSource === 'link' ? 'Website analyse' : 'Algemene kennis'}
+             studySession.materialSource === 'link' ? 'Website analyse' : 'Zonder materiaal'}
           </span>
         </p>
         <p className="text-gray-500 text-sm mb-8">
